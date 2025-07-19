@@ -1,0 +1,141 @@
+{
+  "name": "BankBazaar Loan Scraper - Zyte API",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": [
+          {
+            "mode": "everyDay",
+            "hour": 9,
+            "minute": 0
+          }
+        ]
+      },
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [100, 100]
+    },
+    {
+      "parameters": {
+        "authentication": "basicAuth",
+        "requestMethod": "POST",
+        "url": "https://api.zyte.com/v1/extract",
+        "responseFormat": "json",
+        "options": {},
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "bodyContentType": "json",
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "url",
+              "value": "https://www.bankbazaar.com/personal-loan"
+            },
+            {
+              "name": "httpResponseBody",
+              "value": true
+            },
+            {
+              "name": "product",
+              "value": true
+            },
+            {
+              "name": "productOptions",
+              "value": {
+                "extractFrom": "httpResponseBody",
+                "ai": true
+              }
+            },
+            {
+              "name": "followRedirect",
+              "value": true
+            }
+          ]
+        }
+      },
+      "name": "Fetch from Zyte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [300, 100],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "REPLACE_WITH_ZYTE_CREDENTIAL_ID",
+          "name": "Zyte Basic Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = items[0].json.product || items[0].json;\n\nconst props = {};\n(data.additionalProperties || []).forEach(p => {\n  props[p.name?.toLowerCase()] = p.value;\n});\n\nreturn [\n  {\n    json: {\n      source: \"BankBazaar\",\n      product_name: data.name || \"\",\n      interest_rate: props[\"fixed\"] || \"\",\n      eligibility: data.description || \"\"\n    }\n  }\n];"
+      },
+      "name": "Parse Zyte Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [500, 100]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "loan_products",
+        "columns": [
+          "source",
+          "product_name",
+          "interest_rate",
+          "eligibility"
+        ]
+      },
+      "name": "Insert into PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [700, 100],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_POSTGRES_CREDENTIAL_ID",
+          "name": "Postgres RDS"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch from Zyte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch from Zyte": {
+      "main": [
+        [
+          {
+            "node": "Parse Zyte Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Zyte Response": {
+      "main": [
+        [
+          {
+            "node": "Insert into PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true
+}
+

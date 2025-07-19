@@ -1,0 +1,77 @@
+{
+  "name": "Workflow C - Notify Users via SES",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Fetch Matches",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [300, 300],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT u.email, u.user_id, lp.product_name, lp.interest_rate FROM matches m JOIN users u ON m.user_id = u.user_id JOIN loan_products lp ON m.product_id = lp.product_id ORDER BY u.user_id;"
+      },
+      "credentials": {
+        "postgres": {
+          "name": "Postgres RDS"
+        }
+      }
+    },
+    {
+      "id": "2",
+      "name": "Split by User",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [500, 300],
+      "parameters": {
+        "language": "javascript",
+        "functionCode": "const grouped = {};\n\nfor (const row of items) {\n  const { email, user_id, product_name, interest_rate } = row.json;\n  if (!grouped[email]) {\n    grouped[email] = {\n      email,\n      user_id,\n      products: []\n    };\n  }\n  grouped[email].products.push({ product_name, interest_rate });\n}\n\nreturn Object.values(grouped).map(user => ({ json: user }));"
+      }
+    },
+    {
+      "id": "3",
+      "name": "Send Email via SES",
+      "type": "n8n-nodes-base.awsSes",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "parameters": {
+        "fromEmail": "singhprashant79072@gmail.com",
+        "toEmail": "={{$json.email}}",
+        "subject": "Loan Products You're Eligible For",
+        "message": "Hello,\n\nBased on your profile, you are eligible for the following loan products:\n\n{{ $json.products.map(p => `• ${p.product_name} - ${p.interest_rate}%`).join('\\n') }}\n\nBest,\nLoan Eligibility Engine"
+      },
+      "credentials": {
+        "aws": {
+          "name": "AWS SES"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Fetch Matches": {
+      "main": [
+        [
+          {
+            "node": "Split by User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split by User": {
+      "main": [
+        [
+          {
+            "node": "Send Email via SES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "trigger": {
+    "type": "manual"
+  }
+}

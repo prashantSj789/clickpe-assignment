@@ -1,0 +1,70 @@
+service: loan-eligibility-engine-new
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: provided.al2
+  region: us-east-1
+
+  environment:
+    DB_HOST: database-2.cy9qgaksibw1.us-east-1.rds.amazonaws.com
+    DB_PORT: 5432
+    DB_USER: postgres
+    DB_PASS: Priyanka
+    DB_NAME: postgres
+
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:ListBucket
+          Resource: arn:aws:s3:::loanuseruploads
+
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+          Resource: arn:aws:s3:::loanuseruploads/*
+
+functions:
+  parseUpload:
+    handler: bootstrap
+    description: Triggered when a CSV is uploaded to S3
+    runtime: provided.al2
+    package:
+      artifact: ./parseUpload.zip
+    environment:
+      DB_HOST: database-2.cy9qgaksibw1.us-east-1.rds.amazonaws.com
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASS: Priyanka
+      DB_NAME: postgres
+      N8N_WEBHOOK_URL: http://3.84.180.118:5678/webhook-test/user-upload-complete
+    events:
+      - s3:
+          bucket: loanuseruploads
+          event: s3:ObjectCreated:*
+          existing: true
+
+  getPresignedUrl:
+    handler: bootstrap
+    description: Generates a presigned URL for S3 upload
+    runtime: provided.al2
+    package:
+      artifact: ./getPresignedUrl.zip
+    environment:
+      UPLOAD_BUCKET: loanuseruploads
+
+    events:
+      - http:
+          path: generate-upload-url
+          method: get
+          cors: true
+
+
+package:
+  individually: true
+  exclude:
+    - ./**  
