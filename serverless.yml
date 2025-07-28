@@ -41,7 +41,7 @@ functions:
       DB_USER: postgres
       DB_PASS: Priyanka
       DB_NAME: postgres
-      N8N_WEBHOOK_URL: http://3.84.180.118:5678/webhook-test/user-upload-complete
+      N8N_WEBHOOK_URL: http://3.84.180.118:5678/webhook/user-upload-complete
     events:
       - s3:
           bucket: loanuseruploads
